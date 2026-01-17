@@ -79,7 +79,7 @@ export default function CoordinatorLayout({
             >
                 {/* SIDEBAR HEADER */}
                 <div style={{ padding: 16 }}>
-                    <Space direction="vertical" size={0}>
+                    <Space orientation="vertical" size={0}>
                         <Text strong style={{ color: '#fff' }}>
                             {coordinator?.name}
                         </Text>

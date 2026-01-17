@@ -5,7 +5,9 @@ import {
     BankOutlined,
     CalendarOutlined,
     SettingOutlined,
-    UserOutlined
+    UserOutlined,
+    BarChartOutlined,
+    DatabaseOutlined
 } from '@ant-design/icons'
 import { usePathname, useRouter } from 'next/navigation'
 
@@ -40,6 +42,16 @@ export default function AdminLayout({
             key: '/admin/coordinators',
             icon: <UserOutlined />,
             label: 'Coordinators',
+        },
+        {
+            key: '/admin/stats',
+            icon: <BarChartOutlined />,
+            label: 'Statistics',
+        },
+        {
+            key: '/admin/master-data',
+            icon: <DatabaseOutlined />,
+            label: 'Master Data',
         }
     ]
 
@@ -48,7 +60,7 @@ export default function AdminLayout({
             <Sider width={220}>
                 <div style={{ padding: 16, textAlign: 'center' }}>
                     <Title level={4} style={{ color: '#fff', margin: 0 }}>
-                        MBS Youth Fest
+                        MES Youth Fest 2026
                     </Title>
                 </div>
 

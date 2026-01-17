@@ -15,6 +15,9 @@ import {
     Upload,
     message,
     Tag,
+    Row,
+    Col,
+    Alert,
 } from 'antd'
 import {
     PlusOutlined,
@@ -48,6 +51,8 @@ export default function StudentsPage() {
         max_individual_events: 0,
         max_group_events: 0,
     })
+    const [searchText, setSearchText] = useState('')
+    const [isLocked, setIsLocked] = useState(false)
 
     const isEditing = (r: any) => r.id === editingKey
 
@@ -57,7 +62,7 @@ export default function StudentsPage() {
         fetchCoordinator()
         fetchEvents()
         fetchLimits()
-        fetchStudents()
+        fetchStudentsWithEvents()
     }, [])
 
     const fetchCoordinator = async () => {
@@ -91,14 +96,68 @@ export default function StudentsPage() {
         setLimits(obj)
     }
 
-    const fetchStudents = async () => {
+    const fetchLockStatus = async () => {
         const { data } = await supabase
+            .from('festival_config')
+            .select('value')
+            .eq('key', 'lock_coordinator_edit')
+            .single()
+
+        setIsLocked(Boolean(data?.value))
+    }
+
+    useEffect(() => {
+        fetchLockStatus()
+    }, [])
+
+
+
+    /**
+     * ✅ FIX: Fetch students WITH event registrations
+     */
+    const fetchStudentsWithEvents = async () => {
+        const { data: studentsData } = await supabase
             .from('students')
             .select('*')
             .eq('created_by', coordinatorId)
             .order('name')
 
-        setStudents(data || [])
+        if (!studentsData?.length) {
+            setStudents([])
+            return
+        }
+
+        const studentIds = studentsData.map(s => s.id)
+
+        const { data: registrations } = await supabase
+            .from('student_event_registrations')
+            .select('student_id, event_id, events(type)')
+            .in('student_id', studentIds)
+
+        const eventMap: Record<string, any> = {}
+
+        registrations?.forEach(r => {
+            if (!eventMap[r.student_id]) {
+                eventMap[r.student_id] = {
+                    individual_events: [],
+                    group_events: [],
+                }
+            }
+
+            if (r.events.type === 'INDIVIDUAL') {
+                eventMap[r.student_id].individual_events.push(r.event_id)
+            } else {
+                eventMap[r.student_id].group_events.push(r.event_id)
+            }
+        })
+
+        const merged = studentsData.map(s => ({
+            ...s,
+            individual_events: eventMap[s.id]?.individual_events || [],
+            group_events: eventMap[s.id]?.group_events || [],
+        }))
+
+        setStudents(merged)
     }
 
     /* ---------------- Student CRUD ---------------- */
@@ -122,12 +181,18 @@ export default function StudentsPage() {
     }
 
     const saveStudent = async (record: any) => {
+
+        if (isLocked) {
+            message.error('Editing is disabled by admin')
+            return
+        }
+
         if (!record.name || !record.batch) {
             message.error('Name and batch are required')
             return
         }
 
-        const studentPayload = {
+        const payload = {
             name: record.name,
             batch: record.batch,
             phone: record.phone,
@@ -142,15 +207,14 @@ export default function StudentsPage() {
         if (record.isNew) {
             const { data } = await supabase
                 .from('students')
-                .insert(studentPayload)
+                .insert(payload)
                 .select()
                 .single()
             studentId = data.id
         } else {
-            await supabase.from('students').update(studentPayload).eq('id', record.id)
+            await supabase.from('students').update(payload).eq('id', record.id)
         }
 
-        /* Save Event Registrations */
         await supabase
             .from('student_event_registrations')
             .delete()
@@ -170,38 +234,20 @@ export default function StudentsPage() {
 
         message.success('Student saved')
         setEditingKey(null)
-        fetchStudents()
-    }
-
-    /* ---------------- Photo Upload ---------------- */
-
-    const uploadPhoto = async (file: any, record: any) => {
-        const path = `${coordinatorId}/${Date.now()}-${file.name}`
-
-        const { data, error } = await supabase.storage
-            .from('student-photos')
-            .upload(path, file)
-
-        if (error) {
-            message.error(error.message)
-            return false
-        }
-
-        const url = supabase.storage
-            .from('student-photos')
-            .getPublicUrl(data.path).data.publicUrl
-
-        record.photo_url = url
-        setStudents([...students])
-        return false
-    }
-
-    const removePhoto = (record: any) => {
-        record.photo_url = null
-        setStudents([...students])
+        fetchStudentsWithEvents()
     }
 
     /* ---------------- Table Columns ---------------- */
+
+    const renderEventTags = (eventIds: string[], allEvents: any[]) => (
+        <Space wrap>
+            {eventIds.map(id => {
+                const ev = allEvents.find(e => e.id === id)
+                return ev ? <Tag key={id}>{ev.name}</Tag> : null
+            })}
+        </Space>
+    )
+
 
     const columns = [
         {
@@ -242,56 +288,24 @@ export default function StudentsPage() {
                 ),
         },
         {
-            title: 'Phone',
-            render: (_: any, r: any) =>
-                isEditing(r) ? (
-                    <Input
-                        value={r.phone}
-                        onChange={e => {
-                            r.phone = e.target.value
-                            setStudents([...students])
-                        }}
-                    />
-                ) : (
-                    r.phone
-                ),
-        },
-        {
-            title: 'Email',
-            render: (_: any, r: any) =>
-                isEditing(r) ? (
-                    <Input
-                        value={r.email}
-                        onChange={e => {
-                            r.email = e.target.value
-                            setStudents([...students])
-                        }}
-                    />
-                ) : (
-                    r.email
-                ),
-        },
-        {
             title: 'Individual Events',
             render: (_: any, r: any) =>
                 isEditing(r) ? (
                     <Select
                         mode="multiple"
                         value={r.individual_events}
-                        style={{ minWidth: 200 }}
+                        style={{ minWidth: 220 }}
                         onChange={v => {
                             r.individual_events = v
                             setStudents([...students])
                         }}
-                        maxTagCount={limits.max_individual_events}
                     >
                         {individualEvents.map(e => (
                             <Option
                                 key={e.id}
                                 value={e.id}
                                 disabled={
-                                    r.individual_events.length >=
-                                    limits.max_individual_events &&
+                                    r.individual_events.length >= limits.max_individual_events &&
                                     !r.individual_events.includes(e.id)
                                 }
                             >
@@ -300,7 +314,7 @@ export default function StudentsPage() {
                         ))}
                     </Select>
                 ) : (
-                    r.individual_events?.length || 0
+                    renderEventTags(r.individual_events, individualEvents)
                 ),
         },
         {
@@ -310,12 +324,11 @@ export default function StudentsPage() {
                     <Select
                         mode="multiple"
                         value={r.group_events}
-                        style={{ minWidth: 200 }}
+                        style={{ minWidth: 220 }}
                         onChange={v => {
                             r.group_events = v
                             setStudents([...students])
                         }}
-                        maxTagCount={limits.max_group_events}
                     >
                         {groupEvents.map(e => (
                             <Option
@@ -331,33 +344,7 @@ export default function StudentsPage() {
                         ))}
                     </Select>
                 ) : (
-                    r.group_events?.length || 0
-                ),
-        },
-        {
-            title: 'Photo',
-            render: (_: any, r: any) =>
-                isEditing(r) ? (
-                    r.photo_url ? (
-                        <Space>
-                            <a href={r.photo_url} target="_blank">View</a>
-                            <Button
-                                icon={<ReloadOutlined />}
-                                onClick={() => removePhoto(r)}
-                            />
-                        </Space>
-                    ) : (
-                        <Upload
-                            beforeUpload={file => uploadPhoto(file, r)}
-                            showUploadList={false}
-                        >
-                            <Button icon={<UploadOutlined />}>Upload</Button>
-                        </Upload>
-                    )
-                ) : r.photo_url ? (
-                    <a href={r.photo_url} target="_blank">View</a>
-                ) : (
-                    '—'
+                    renderEventTags(r.group_events, groupEvents)
                 ),
         },
         {
@@ -368,34 +355,67 @@ export default function StudentsPage() {
                         Save
                     </Button>
                 ) : (
-                    <Button type="link" onClick={() => setEditingKey(r.id)}>
-                        Edit
-                    </Button>
+                    !isLocked && (
+                        <Button type="link" onClick={() => setEditingKey(r.id)}>
+                            Edit
+                        </Button>
+                    )
+
                 ),
         },
     ]
 
     return (
         <Layout>
-            {/* HEADER */}
-            <Header style={{ background: '#fff' }}>
-                <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                    <Text>
-                        Welcome, <strong>{coordinator?.name}</strong>
-                    </Text>
+            <Header
+                style={{
+                    background: '#f5f7fa',
+                    padding: '16px 24px',
+                    height: 'auto',
+                }}
+            >
+                <Card bordered={false} style={{ borderBottom: '1px solid #f0f0f0' }}>
 
-                    <Title level={4} style={{ margin: 0 }}>
-                        MES Youth Festival 2026
-                    </Title>
+                    <Row align="middle">
+                        {/* LEFT: Welcome */}
+                        <Col span={8}>
+                            <Space orientation="vertical" size={0}>
+                                <Text type="secondary">👋 Welcome</Text>
+                                <Text strong style={{ fontSize: 16 }}>
+                                    {coordinator?.name}
+                                </Text>
+                                <Text type="secondary">
+                                    {coordinator?.institutions?.name}
+                                </Text>
+                            </Space>
+                        </Col>
 
-                    <Space direction="vertical" size={0}>
-                        <Text strong>{coordinator?.institutions?.name}</Text>
-                        <Text type="secondary">
-                            {dayjs().format('DD MMM YYYY')}
-                        </Text>
-                    </Space>
-                </Space>
+                        {/* CENTER: FEST */}
+                        <Col span={8} style={{ textAlign: 'center' }}>
+                            <Title level={3} style={{ margin: 0 }}>
+                                MES Youth Festival 2026
+                            </Title>
+                            <Text type="secondary">
+                                Student Registration Portal
+                            </Text>
+                        </Col>
+
+                        {/* RIGHT: DATE */}
+                        <Col span={8} style={{ textAlign: 'right' }}>
+                            <Space orientation="vertical" size={0}>
+                                <Text type="secondary">Today</Text>
+                                <Text strong>
+                                    {dayjs().format('dddd')}
+                                </Text>
+                                <Text type="secondary">
+                                    {dayjs().format('DD MMM YYYY')}
+                                </Text>
+                            </Space>
+                        </Col>
+                    </Row>
+                </Card>
             </Header>
+
 
             <Content style={{ padding: 24 }}>
                 <Card
@@ -404,18 +424,40 @@ export default function StudentsPage() {
                         <Button
                             type="primary"
                             icon={<PlusOutlined />}
+                            disabled={isLocked}
                             onClick={addStudent}
                         >
                             Add Student
                         </Button>
+
                     }
                 >
+                    <Input
+                        placeholder="Search student by name"
+                        allowClear
+                        style={{ width: 300, marginBottom: 16 }}
+                        value={searchText}
+                        onChange={e => setSearchText(e.target.value)}
+                    />
+                    {isLocked && (
+                        <Alert
+                            type="warning"
+                            showIcon
+                            message="Editing Disabled"
+                            description="Student editing is currently locked by the admin. Please contact the admin for any changes."
+                            style={{ marginBottom: 16 }}
+                        />
+                    )}
+
                     <Table
                         rowKey="id"
                         columns={columns}
-                        dataSource={students}
+                        dataSource={students.filter(s =>
+                            s.name.toLowerCase().includes(searchText.toLowerCase())
+                        )}
                         pagination={{ pageSize: 6 }}
                     />
+
                 </Card>
             </Content>
         </Layout>

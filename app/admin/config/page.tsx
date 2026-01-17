@@ -13,6 +13,7 @@ import {
     Col,
     Input,
     message,
+    Switch
 } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
 import { supabase } from '@/lib/supabase'
@@ -21,6 +22,22 @@ const { Title, Text } = Typography
 
 export default function ConfigPage() {
     /* ---------------- Participation Limits ---------------- */
+    const [lockCoordinatorEdit, setLockCoordinatorEdit] = useState(false)
+    useEffect(() => {
+        const loadConfig = async () => {
+            const { data } = await supabase
+                .from('festival_config')
+                .select('*')
+
+            const map: any = {}
+            data?.forEach(c => (map[c.key] = c.value))
+
+            setLockCoordinatorEdit(Boolean(map.lock_coordinator_edit))
+        }
+
+        loadConfig()
+    }, [])
+
     const [form] = Form.useForm()
 
     const loadParticipationConfig = async () => {
@@ -124,6 +141,42 @@ export default function ConfigPage() {
                     </Button>
                 </Form>
             </Card>
+
+            {/* LOCK COORDINATOR EDIT */}
+            <Card title="Coordinator Access Control">
+                <Space orientation="vertical">
+                    <Space>
+                        <Switch
+                            checked={lockCoordinatorEdit}
+                            onChange={async checked => {
+                                setLockCoordinatorEdit(checked)
+
+                                await supabase
+                                    .from('festival_config')
+                                    .upsert({
+                                        key: 'lock_coordinator_edit',
+                                        value: checked ? 1 : 0,
+                                    })
+
+                                message.success(
+                                    checked
+                                        ? 'Coordinator editing disabled'
+                                        : 'Coordinator editing enabled'
+                                )
+                            }}
+                        />
+                        <span>
+                            Disable student editing for coordinators
+                        </span>
+                    </Space>
+
+                    <Typography.Text type="secondary">
+                        When enabled, coordinators can only view student data.
+                        All changes must be done from Master Data.
+                    </Typography.Text>
+                </Space>
+            </Card>
+
 
             {/* ID CARD CONFIG */}
             <Card title="ID Card Template & Layout">
