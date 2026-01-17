@@ -8,6 +8,7 @@ import {
     Typography,
     Button,
     Space,
+    Alert
 } from 'antd'
 import {
     TeamOutlined,
@@ -30,9 +31,26 @@ export default function CoordinatorLayout({
     const router = useRouter()
 
     const [coordinator, setCoordinator] = useState<any>(null)
+    const [announcement, setAnnouncement] = useState<any>(null)
 
     useEffect(() => {
         fetchCoordinator()
+    }, [])
+
+    useEffect(() => {
+        const fetchAnnouncement = async () => {
+            const { data } = await supabase
+                .from('global_announcements')
+                .select('*')
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single()
+
+            setAnnouncement(data)
+        }
+
+        fetchAnnouncement()
     }, [])
 
     const fetchCoordinator = async () => {
@@ -43,6 +61,12 @@ export default function CoordinatorLayout({
             .single()
 
         setCoordinator(data)
+    }
+
+    const severityMap: any = {
+        INFO: 'info',
+        WARNING: 'warning',
+        CRITICAL: 'error',
     }
 
     const menuItems = [
@@ -97,6 +121,19 @@ export default function CoordinatorLayout({
                     items={menuItems}
                     onClick={({ key }) => router.push(key)}
                 />
+
+                {/* ANNOUNCEMENT */}
+
+                {announcement && (
+                    <div style={{ padding: 16 }}>
+                        <Alert
+                            message="Announcement"
+                            description={announcement.message}
+                            type={severityMap[announcement.severity]}
+                            showIcon
+                        />
+                    </div>
+                )}
 
                 {/* LOGOUT */}
                 <div

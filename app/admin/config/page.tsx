@@ -13,7 +13,9 @@ import {
     Col,
     Input,
     message,
-    Switch
+    Switch,
+    Alert,
+    Select
 } from 'antd'
 import { UploadOutlined } from '@ant-design/icons'
 import { supabase } from '@/lib/supabase'
@@ -69,6 +71,67 @@ export default function ConfigPage() {
             .upsert(updates, { onConflict: 'key' })
 
         message.success('Participation limits saved')
+    }
+
+    /* ---------------- Announcement Section ---------------- */
+    const [announcement, setAnnouncement] = useState({
+        message: '',
+        severity: 'INFO',
+    })
+    useEffect(() => {
+        const fetchAnnouncement = async () => {
+            const { data } = await supabase
+                .from('global_announcements')
+                .select('*')
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single()
+
+            if (data) {
+                setAnnouncement({
+                    message: data.message,
+                    severity: data.severity,
+                })
+            }
+        }
+
+        fetchAnnouncement()
+    }, [])
+    const saveAnnouncement = async () => {
+        if (!announcement.message.trim()) {
+            message.error('Message cannot be empty')
+            return
+        }
+
+        // deactivate previous
+        await supabase
+            .from('global_announcements')
+            .update({ is_active: false })
+            .eq('is_active', true)
+
+        // insert new
+        await supabase.from('global_announcements').insert({
+            message: announcement.message,
+            severity: announcement.severity,
+            is_active: true,
+        })
+
+        message.success('Announcement published')
+    }
+
+    const clearAnnouncement = async () => {
+        await supabase
+            .from('global_announcements')
+            .update({ is_active: false })
+            .eq('is_active', true)
+
+        setAnnouncement({
+            message: '',
+            severity: 'INFO',
+        })
+
+        message.success('Announcement cleared')
     }
 
     /* ---------------- ID Card Config ---------------- */
@@ -177,6 +240,49 @@ export default function ConfigPage() {
                 </Space>
             </Card>
 
+            {/* ANNOUNCEMENT SECTION */}
+            <Card title="Global Announcement (For Coordinators)">
+                <Space orientation="vertical" style={{ width: '100%' }}>
+                    <Select
+                        value={announcement.severity}
+                        style={{ width: 200 }}
+                        onChange={v =>
+                            setAnnouncement({ ...announcement, severity: v })
+                        }
+                    >
+                        <Select.Option value="INFO">Info</Select.Option>
+                        <Select.Option value="WARNING">Warning</Select.Option>
+                        <Select.Option value="CRITICAL">Critical</Select.Option>
+                    </Select>
+
+                    <Input.TextArea
+                        rows={4}
+                        placeholder="Enter announcement message for all coordinators"
+                        value={announcement.message}
+                        onChange={e =>
+                            setAnnouncement({
+                                ...announcement,
+                                message: e.target.value,
+                            })
+                        }
+                    />
+
+                    <Space>
+                        <Button type="primary" onClick={saveAnnouncement}>
+                            Publish Announcement
+                        </Button>
+
+                        <Button danger onClick={clearAnnouncement}>
+                            Clear Announcement
+                        </Button>
+                    </Space>
+
+                    <Typography.Text type="secondary">
+                        Clearing the announcement will immediately remove it from
+                        all coordinator screens.
+                    </Typography.Text>
+                </Space>
+            </Card>
 
             {/* ID CARD CONFIG */}
             <Card title="ID Card Template & Layout">
