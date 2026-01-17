@@ -1,15 +1,18 @@
 'use client'
 
-import { Layout, Menu, Typography } from 'antd'
+import { Badge, Layout, Menu, Typography } from 'antd'
 import {
     BankOutlined,
     CalendarOutlined,
     SettingOutlined,
     UserOutlined,
     BarChartOutlined,
-    DatabaseOutlined
+    DatabaseOutlined,
+    BellOutlined
 } from '@ant-design/icons'
 import { usePathname, useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import { useState, useEffect } from 'react'
 
 const { Header, Sider, Content } = Layout
 const { Title } = Typography
@@ -21,6 +24,17 @@ export default function AdminLayout({
 }) {
     const pathname = usePathname()
     const router = useRouter()
+
+    const [openCount, setOpenCount] = useState(0)
+
+    useEffect(() => {
+        supabase
+            .from('support_tickets')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'OPEN')
+            .then(({ count }) => setOpenCount(count || 0))
+    }, [])
+
 
     const menuItems = [
         {
@@ -52,6 +66,15 @@ export default function AdminLayout({
             key: '/admin/master-data',
             icon: <DatabaseOutlined />,
             label: 'Master Data',
+        },
+        {
+            key: '/admin/notifications',
+            icon: (
+                <Badge count={openCount} size="small">
+                    <BellOutlined />
+                </Badge>
+            ),
+            label: 'Notifications',
         }
     ]
 

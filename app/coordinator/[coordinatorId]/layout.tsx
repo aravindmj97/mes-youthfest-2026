@@ -15,6 +15,7 @@ import {
     BarChartOutlined,
     IdcardOutlined,
     LogoutOutlined,
+    MessageOutlined,
 } from '@ant-design/icons'
 import { supabase } from '@/lib/supabase'
 
@@ -85,6 +86,11 @@ export default function CoordinatorLayout({
             icon: <IdcardOutlined />,
             label: 'ID Cards',
         },
+        {
+            key: `/coordinator/${coordinatorId}/contact-admin`,
+            icon: <MessageOutlined />,
+            label: 'Contact Admin',
+        }
     ]
 
     const logout = async () => {

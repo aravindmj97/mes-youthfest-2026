@@ -188,7 +188,7 @@ export default function IdCardsPage() {
     }
 
     return (
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Space orientation="vertical" size="large" style={{ width: '100%' }}>
             <Title level={3}>ID Card Generation</Title>
 
             {/* BULK DOWNLOAD */}

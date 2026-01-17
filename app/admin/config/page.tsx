@@ -173,7 +173,7 @@ export default function ConfigPage() {
     }
 
     return (
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Space orientation="vertical" size="large" style={{ width: '100%' }}>
             <Title level={3}>Festival Configuration</Title>
 
             {/* PARTICIPATION LIMITS */}
@@ -313,7 +313,7 @@ export default function ConfigPage() {
                     <Col span={12}>
                         <Text strong>Field Positioning (px)</Text>
 
-                        <Space direction="vertical" style={{ width: '100%' }}>
+                        <Space orientation="vertical" style={{ width: '100%' }}>
                             <InputNumber
                                 addonBefore="Name X"
                                 value={layout.name_x}

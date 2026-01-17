@@ -111,7 +111,7 @@ export default function InstitutionsPage() {
     ]
 
     return (
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Space orientation="vertical" size="large" style={{ width: '100%' }}>
             <Title level={3}>Institutions</Title>
 
             <Button
