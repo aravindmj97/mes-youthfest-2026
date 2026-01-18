@@ -11,6 +11,7 @@ import {
     Typography,
     message,
     Popconfirm,
+    Checkbox,
 } from 'antd'
 import { PlusOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons'
 import { supabase } from '@/lib/supabase'
@@ -47,6 +48,7 @@ export default function EventsPage() {
             id: 'NEW',
             name: '',
             type: 'INDIVIDUAL',
+            is_on_stage: false,
             is_active: true,
             isNew: true,
         }
@@ -65,6 +67,7 @@ export default function EventsPage() {
             ; ({ error } = await supabase.from('events').insert({
                 name: record.name,
                 type: record.type,
+                is_on_stage: record.is_on_stage,
                 is_active: record.is_active,
             }))
         } else {
@@ -73,6 +76,7 @@ export default function EventsPage() {
                 .update({
                     name: record.name,
                     type: record.type,
+                    is_on_stage: record.is_on_stage,
                     is_active: record.is_active,
                 })
                 .eq('id', record.id))
@@ -127,7 +131,36 @@ export default function EventsPage() {
                     </Select>
                 ) : (
                     record.type
+            ),
+            filters: [
+                { text: 'Individual', value: 'INDIVIDUAL' },
+                { text: 'Group', value: 'GROUP' },
+            ],
+            onFilter: (v: any, r: any) => r.type === v,
+        },
+        {
+            title: 'On-Stage',
+            dataIndex: 'is_on_stage',
+            width: 120,
+            render: (v: boolean, r: any) =>
+                isEditing(r) ? (
+                    <Checkbox
+                        checked={v}
+                        onChange={e => {
+                            r.is_on_stage = e.target.checked
+                            setData([...data])
+                        }}
+                    >
+                        On-Stage
+                    </Checkbox>
+                ) : (
+                    <span>{v ? 'Yes' : 'No'}</span>
                 ),
+            filters: [
+                { text: 'On-Stage', value: true },
+                { text: 'Off-Stage', value: false },
+            ],
+            onFilter: (v: any, r:any) => r.is_on_stage === v,
         },
         {
             title: 'Active',
