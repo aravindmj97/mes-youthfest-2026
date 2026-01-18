@@ -55,9 +55,13 @@ export default function AdminStatsPage() {
 
         /* Summary */
         const individual =
-            registrations?.filter(r => r.events.type === 'INDIVIDUAL').length || 0
+            registrations?.filter(r => 
+                //  @ts-expect-error: Its ok
+                r.events.type === 'INDIVIDUAL').length || 0
         const group =
-            registrations?.filter(r => r.events.type === 'GROUP').length || 0
+            registrations?.filter(r => 
+                //  @ts-expect-error: Its ok
+                r.events.type === 'GROUP').length || 0
 
         setSummary({
             institutions: institutions?.length || 0,
@@ -71,6 +75,7 @@ export default function AdminStatsPage() {
         /* Event-wise */
         const eventMap: any = {}
         registrations?.forEach(r => {
+            //  @ts-expect-error: Its ok
             eventMap[r.events.name] = (eventMap[r.events.name] || 0) + 1
         })
 

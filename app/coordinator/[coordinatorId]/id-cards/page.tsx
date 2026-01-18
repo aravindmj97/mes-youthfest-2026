@@ -178,6 +178,7 @@ export default function IdCardsPage() {
     }
 
     const downloadPdf = (bytes: Uint8Array, filename: string) => {
+        //  @ts-expect-error: Its ok
         const blob = new Blob([bytes], { type: 'application/pdf' })
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')

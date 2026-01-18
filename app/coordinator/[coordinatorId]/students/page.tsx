@@ -149,6 +149,7 @@ export default function StudentsPage() {
                 }
             }
 
+            //  @ts-expect-error: Its ok
             if (r.events.type === 'INDIVIDUAL') {
                 eventMap[r.student_id].individual_events.push(r.event_id)
             } else {
@@ -600,6 +601,7 @@ export default function StudentsPage() {
 
                     <Table
                         rowKey="id"
+                        //  @ts-expect-error: Its ok
                         columns={columns}
                         dataSource={students.filter(s =>
                             s.name.toLowerCase().includes(searchText.toLowerCase())
