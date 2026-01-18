@@ -10,11 +10,13 @@ import {
     Typography,
     message,
     Popconfirm,
+    Tooltip,
 } from 'antd'
 import {
     PlusOutlined,
     SaveOutlined,
     CloseOutlined,
+    EyeOutlined,
 } from '@ant-design/icons'
 import { supabase } from '@/lib/supabase'
 import { hardDelete, softDelete } from '@/lib/service'
@@ -200,6 +202,22 @@ export default function CoordinatorsPage() {
                             <Button type="link" danger>Delete</Button>
                         </Popconfirm>
 
+                            {/* NEW: Open Coordinator Students Page */}
+                            <Tooltip title="Open Coordinator Student Page">
+                                <Button
+                                    type="link"
+                                    icon={<EyeOutlined />}
+                                    onClick={() =>
+                                        window.open(
+                                            `/coordinator/${record.id}/students`,
+                                            '_blank',
+                                            'noopener,noreferrer'
+                                        )
+                                    }
+                                >
+                                    View Students
+                                </Button>
+                            </Tooltip>
                     </Space>
                 ),
         },
