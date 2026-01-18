@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import dayjs from 'dayjs'
+import * as XLSX from 'xlsx'
 import {
     Layout,
     Typography,
@@ -18,25 +19,22 @@ import {
     Row,
     Col,
     Alert,
+    Popconfirm,
 } from 'antd'
 import {
     PlusOutlined,
     UploadOutlined,
     ReloadOutlined,
+    DownloadOutlined,
 } from '@ant-design/icons'
 import { supabase } from '@/lib/supabase'
+import { softDelete } from '@/lib/service'
+import { BATCH_YEARS, GENDERS } from '@/lib/constants'
+import saveAs from 'file-saver'
 
 const { Header, Content } = Layout
 const { Title, Text } = Typography
 const { Option } = Select
-
-const BATCH_OPTIONS = [
-    'First Year',
-    'Second Year',
-    'Third Year',
-    'Fourth Year',
-    'Fifth Year',
-]
 
 export default function StudentsPage() {
     const { coordinatorId } = useParams()
@@ -116,14 +114,21 @@ export default function StudentsPage() {
      * ✅ FIX: Fetch students WITH event registrations
      */
     const fetchStudentsWithEvents = async () => {
-        const { data: studentsData } = await supabase
+        const { data: studentsData, error } = await supabase
             .from('students')
-            .select('*')
-            .eq('created_by', coordinatorId)
-            .order('name')
+            .select(`
+                *,
+                institutions!inner(
+                id,
+                coordinators!inner(id)
+                )
+            `)
+            .eq('institutions.coordinators.id', coordinatorId)
+            .eq('is_active', true)
 
         if (!studentsData?.length) {
             setStudents([])
+            if (error) message.error(error.message)
             return
         }
 
@@ -168,6 +173,8 @@ export default function StudentsPage() {
                 id: 'NEW',
                 name: '',
                 batch: '',
+                batch_info: '',
+                gender: '',
                 phone: '',
                 email: '',
                 individual_events: [],
@@ -195,6 +202,8 @@ export default function StudentsPage() {
         const payload = {
             name: record.name,
             batch: record.batch,
+            batch_info: record.batch_info,
+            gender: record.gender,
             phone: record.phone,
             email: record.email,
             photo_url: record.photo_url,
@@ -205,14 +214,22 @@ export default function StudentsPage() {
         let studentId = record.id
 
         if (record.isNew) {
-            const { data } = await supabase
+            const { data, error } = await supabase
                 .from('students')
                 .insert(payload)
                 .select()
                 .single()
             studentId = data.id
+            if (error) {
+                message.error(error.message)
+                return
+            }
         } else {
-            await supabase.from('students').update(payload).eq('id', record.id)
+            const { error } = await supabase.from('students').update(payload).eq('id', record.id)
+            if (error) {
+                message.error(error.message)
+                return
+            }
         }
 
         await supabase
@@ -252,6 +269,8 @@ export default function StudentsPage() {
     const columns = [
         {
             title: 'Name',
+            fixed: 'left',
+            width: 200,
             render: (_: any, r: any) =>
                 isEditing(r) ? (
                     <Input
@@ -266,6 +285,28 @@ export default function StudentsPage() {
                 ),
         },
         {
+            title: 'Gender',
+            render: (_: any, r: any) =>
+                isEditing(r) ? (
+                    <Select
+                        value={r.gender}
+                        style={{ width: 120 }}
+                        onChange={v => {
+                            r.gender = v
+                            setStudents([...students])
+                        }}
+                    >
+                        {GENDERS.map(g => (
+                            <Select.Option key={g} value={g}>
+                                {g}
+                            </Select.Option>
+                        ))}
+                    </Select>
+                ) : (
+                    r.gender || '-'
+                ),
+        },
+        {
             title: 'Batch',
             render: (_: any, r: any) =>
                 isEditing(r) ? (
@@ -277,7 +318,7 @@ export default function StudentsPage() {
                             setStudents([...students])
                         }}
                     >
-                        {BATCH_OPTIONS.map(b => (
+                        {BATCH_YEARS.map(b => (
                             <Option key={b} value={b}>
                                 {b}
                             </Option>
@@ -285,6 +326,52 @@ export default function StudentsPage() {
                     </Select>
                 ) : (
                     <Tag>{r.batch}</Tag>
+                ),
+        },
+        {
+            title: 'Batch Info',
+            render: (_: any, r: any) =>
+                isEditing(r) ? (
+                    <Input
+                        value={r.batch_info}
+                        placeholder="Stream / Section / Dept"
+                        onChange={e => {
+                            r.batch_info = e.target.value
+                            setStudents([...students])
+                        }}
+                    />
+                ) : (
+                    r.batch_info || '-'
+                ),
+        },
+        {
+            title: 'Email',
+            render: (_: any, record: any) =>
+                isEditing(record) ? (
+                    <Input
+                        value={record.email}
+                        onChange={e => {
+                            record.email = e.target.value
+                            setStudents([...students])
+                        }}
+                    />
+                ) : (
+                    record.email
+                ),
+        },
+        {
+            title: 'Phone',
+            render: (_: any, record: any) =>
+                isEditing(record) ? (
+                    <Input
+                        value={record.phone}
+                        onChange={e => {
+                            record.phone = e.target.value
+                            setStudents([...students])
+                        }}
+                    />
+                ) : (
+                    record.phone
                 ),
         },
         {
@@ -349,6 +436,8 @@ export default function StudentsPage() {
         },
         {
             title: 'Actions',
+            fixed: 'right',
+            width: 160,
             render: (_: any, r: any) =>
                 isEditing(r) ? (
                     <Button type="link" onClick={() => saveStudent(r)}>
@@ -356,14 +445,65 @@ export default function StudentsPage() {
                     </Button>
                 ) : (
                     !isLocked && (
-                        <Button type="link" onClick={() => setEditingKey(r.id)}>
-                            Edit
-                        </Button>
+                        <Space>
+                            <Button type="link" onClick={() => setEditingKey(r.id)}>
+                                Edit
+                            </Button>
+                            <Popconfirm
+                                title="Delete this student?"
+                                onConfirm={async () => {
+                                    await softDelete('students', r.id);
+                                    fetchStudentsWithEvents();
+                                }}
+                            >
+                                <Button type="link" danger>Delete</Button>
+                            </Popconfirm>
+                        </Space>
+
                     )
 
                 ),
         },
     ]
+
+    /* ---------------- Export Data ---------------- */
+
+    const getEventNames = (ids: string[]) => {
+        const events = [...individualEvents, ...groupEvents]
+        return ids
+            .map(id => events.find(e => e.id === id)?.name)
+            .filter(Boolean)
+            .join(', ')
+    }
+
+    const exportStudents = () => {
+        const exportData = students.map(s => ({
+            Name: s.name,
+            Gender: s.gender,
+            'Batch Year': s.batch,
+            'Batch Info': s.batch_info,
+            Phone: s.phone,
+            Email: s.email,
+
+            'Individual Events': getEventNames(s.individual_events),
+            'Group Events': getEventNames(s.group_events),
+        }))
+
+        const worksheet = XLSX.utils.json_to_sheet(exportData)
+        const workbook = XLSX.utils.book_new()
+
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Students')
+
+        const buffer = XLSX.write(workbook, {
+            bookType: 'xlsx',
+            type: 'array',
+        })
+
+        saveAs(
+            new Blob([buffer]),
+            'students.xlsx'
+        )
+    }
 
     return (
         <Layout>
@@ -449,12 +589,23 @@ export default function StudentsPage() {
                         />
                     )}
 
+                    <Space style={{ marginLeft: 16 }}>
+                        <Button
+                            icon={<DownloadOutlined />}
+                            onClick={exportStudents}
+                        >
+                            Export Students
+                        </Button>
+                    </Space>
+
                     <Table
                         rowKey="id"
                         columns={columns}
                         dataSource={students.filter(s =>
                             s.name.toLowerCase().includes(searchText.toLowerCase())
                         )}
+                        scroll={{ x: 1800, y: 600 }}
+                        sticky
                         pagination={{ pageSize: 6 }}
                     />
 

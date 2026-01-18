@@ -9,6 +9,7 @@ import {
     Space,
     Typography,
     message,
+    Popconfirm,
 } from 'antd'
 import {
     PlusOutlined,
@@ -16,6 +17,7 @@ import {
     CloseOutlined,
 } from '@ant-design/icons'
 import { supabase } from '@/lib/supabase'
+import { hardDelete, softDelete } from '@/lib/service'
 
 const { Title } = Typography
 const { Option } = Select
@@ -183,9 +185,22 @@ export default function CoordinatorsPage() {
                         />
                     </Space>
                 ) : (
-                    <Button type="link" onClick={() => setEditingKey(record.id)}>
-                        Edit
-                    </Button>
+                    <Space>
+                        <Button type="link" onClick={() => setEditingKey(record.id)}>
+                            Edit
+                        </Button>
+                        <Popconfirm
+                            title="Delete this coordinator?"
+                            description="Coordinator will no longer be able to login."
+                                onConfirm={async () => {
+                                    await hardDelete('coordinators', record.id);
+                                    fetchCoordinators();
+                                }}
+                        >
+                            <Button type="link" danger>Delete</Button>
+                        </Popconfirm>
+
+                    </Space>
                 ),
         },
     ]

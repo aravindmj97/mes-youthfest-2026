@@ -11,9 +11,11 @@ import {
     Space,
     message,
     Typography,
+    Popconfirm,
 } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { supabase } from '@/lib/supabase'
+import { hardDelete, softDelete } from '@/lib/service'
 
 const { Title } = Typography
 
@@ -103,9 +105,22 @@ export default function InstitutionsPage() {
         {
             title: 'Actions',
             render: (_: any, record: any) => (
-                <Button type="link" onClick={() => openModal(record)}>
-                    Edit
-                </Button>
+                <Space>
+                    <Button type="link" onClick={() => openModal(record)}>
+                        Edit
+                    </Button>
+                    <Popconfirm
+                        title="Delete this institution?"
+                        description="This will hide the institution from coordinators."
+                        onConfirm={async () => {
+                            await hardDelete('institutions', record.id);
+                            fetchInstitutions();
+                        }}
+                    >
+                        <Button type="link" danger>Delete</Button>
+                    </Popconfirm>
+
+                </Space>
             ),
         },
     ]

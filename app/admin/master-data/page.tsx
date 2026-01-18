@@ -11,11 +11,16 @@ import {
     Input,
     Tag,
     message,
+    Popconfirm,
+    Switch,
 } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import { supabase } from '@/lib/supabase'
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
+import { hardDelete, softDelete } from '@/lib/service'
+import { Box } from '@ant-design/charts'
+import { BATCH_YEARS, GENDERS } from '@/lib/constants'
 
 const { Title } = Typography
 const { Option } = Select
@@ -40,13 +45,14 @@ export default function AdminMasterDataPage() {
 
     const [editingKey, setEditingKey] = useState<string | null>(null)
     const [selectedEvent, setSelectedEvent] = useState<string | null>(null)
+    const [showInactive, setShowInactive] = useState(false)
 
     const isEditing = (record: any) => record.id === editingKey
 
     /* ---------------- Initial Fetch ---------------- */
     useEffect(() => {
         fetchAll()
-    }, [])
+    }, [showInactive])
 
     const fetchAll = async () => {
         const [
@@ -56,7 +62,12 @@ export default function AdminMasterDataPage() {
             { data: configData },
             { data: registrations },
         ] = await Promise.all([
-            supabase.from('students').select('*, institutions(name)'),
+            showInactive
+                ? supabase.from('students').select('*, institutions(name)')
+                : supabase
+                    .from('students')
+                    .select('*, institutions(name)')
+                    .eq('is_active', true),
             supabase.from('events').select('*'),
             supabase.from('institutions').select('*'),
             supabase.from('festival_config').select('*'),
@@ -108,16 +119,23 @@ export default function AdminMasterDataPage() {
             return
         }
 
-        await supabase
+        const { error } = await supabase
             .from('students')
             .update({
                 name: record.name,
                 batch: record.batch,
+                batch_info: record.batch_info,
+                gender: record.gender,
                 phone: record.phone,
                 email: record.email,
                 institution_id: record.institution_id,
             })
             .eq('id', record.id)
+
+        if (error) {
+            message.error(error.message)
+            return
+        }
 
         await supabase
             .from('student_event_registrations')
@@ -133,7 +151,11 @@ export default function AdminMasterDataPage() {
         }))
 
         if (registrations.length) {
-            await supabase.from('student_event_registrations').insert(registrations)
+            const { error } = await supabase.from('student_event_registrations').insert(registrations)
+            if (error) {
+                message.error(error.message)
+                return
+            }
         }
 
         message.success('Student updated')
@@ -148,6 +170,13 @@ export default function AdminMasterDataPage() {
         XLSX.utils.book_append_sheet(wb, sheet, 'Data')
         const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
         saveAs(new Blob([buf]), `${filename}.xlsx`)
+    }
+
+    const getEventNames = (ids: string[]) => {
+        return ids
+            .map(id => events.find(e => e.id === id)?.name)
+            .filter(Boolean)
+            .join(', ')
     }
 
     /* ---------------- Global Student Columns ---------------- */
@@ -167,6 +196,36 @@ export default function AdminMasterDataPage() {
                     r.name
                 ),
             sorter: (a: any, b: any) => a.name.localeCompare(b.name),
+            fixed: 'left',
+            width: 200,
+        },
+        {
+            title: 'Gender',
+            render: (_: any, r: any) =>
+                isEditing(r) ? (
+                    <Select
+                        value={r.gender}
+                        style={{ width: 120 }}
+                        onChange={v => {
+                            r.gender = v
+                            setStudents([...students])
+                        }}
+                    >
+                        {GENDERS.map(g => (
+                            <Select.Option key={g} value={g}>
+                                {g}
+                            </Select.Option>
+                        ))}
+                    </Select>
+                ) : (
+                    r.gender || '-'
+                ),
+            filters: [
+                { text: 'Male', value: 'Male' },
+                { text: 'Female', value: 'Female' },
+                { text: 'Other', value: 'Other' },
+            ],
+            onFilter: (v: any, r: any) => r.gender === v,
         },
         {
             title: 'Batch',
@@ -180,7 +239,7 @@ export default function AdminMasterDataPage() {
                             setStudents([...students])
                         }}
                     >
-                        {BATCHES.map(b => (
+                        {BATCH_YEARS.map(b => (
                             <Option key={b} value={b}>
                                 {b}
                             </Option>
@@ -189,8 +248,54 @@ export default function AdminMasterDataPage() {
                 ) : (
                     r.batch
                 ),
-            filters: BATCHES.map(b => ({ text: b, value: b })),
+            filters: BATCH_YEARS.map(b => ({ text: b, value: b })),
             onFilter: (v: any, r: any) => r.batch === v,
+        },
+        {
+            title: 'Batch Info',
+            render: (_: any, r: any) =>
+                isEditing(r) ? (
+                    <Input
+                        value={r.batch_info}
+                        placeholder="Stream / Section / Dept"
+                        onChange={e => {
+                            r.batch_info = e.target.value
+                            setStudents([...students])
+                        }}
+                    />
+                ) : (
+                    r.batch_info || '-'
+                ),
+        },
+        {
+            title: 'Email',
+            render: (_: any, record: any) =>
+                isEditing(record) ? (
+                    <Input
+                        value={record.email}
+                        onChange={e => {
+                            record.email = e.target.value
+                            setStudents([...students])
+                        }}
+                    />
+                ) : (
+                    record.email
+                ),
+        },
+        {
+            title: 'Phone',
+            render: (_: any, record: any) =>
+                isEditing(record) ? (
+                    <Input
+                        value={record.phone}
+                        onChange={e => {
+                            record.phone = e.target.value
+                            setStudents([...students])
+                        }}
+                    />
+                ) : (
+                    record.phone
+                ),
         },
         {
             title: 'Institute',
@@ -288,7 +393,35 @@ export default function AdminMasterDataPage() {
                 ),
         },
         {
+            title: 'Active',
+            dataIndex: 'is_active',
+            render: (v: boolean, r: any) => (
+                <Switch
+                    checked={v}
+                    onChange={async checked => {
+                        await supabase
+                            .from('students')
+                            .update({ is_active: checked })
+                            .eq('id', r.id)
+
+                        message.success(
+                            `Student ${checked ? 'activated' : 'deactivated'}`
+                        )
+
+                        fetchAll()
+                    }}
+                />
+            ),
+            filters: [
+                { text: 'Active', value: true },
+                { text: 'Inactive', value: false },
+            ],
+            onFilter: (v: any, r: any) => r.is_active === v,
+        },
+        {
             title: 'Actions',
+            fixed: 'right',
+            width: 160,
             render: (_: any, r: any) =>
                 isEditing(r) ? (
                     <Space>
@@ -300,9 +433,22 @@ export default function AdminMasterDataPage() {
                         </Button>
                     </Space>
                 ) : (
-                    <Button type="link" onClick={() => setEditingKey(r.id)}>
-                        Edit
-                    </Button>
+                    <Space>
+                        <Button type="link" onClick={() => setEditingKey(r.id)}>
+                            Edit
+                        </Button>
+                        <Popconfirm
+                            title="Delete this student?"
+                            description="Student will be removed from active participation."
+                            onConfirm={async () => {
+                                await hardDelete('students', r.id);
+                                fetchAll();
+                            }}
+                        >
+                            <Button type="link" danger>Delete</Button>
+                        </Popconfirm>
+
+                    </Space>
                 ),
         },
     ]
@@ -329,6 +475,9 @@ export default function AdminMasterDataPage() {
             filters: institutes.map(i => ({ text: i.name, value: i.name })),
             onFilter: (v: any, r: any) => r.institutions?.name === v,
         },
+        { title: 'Gender', dataIndex: 'gender' },
+        { title: 'Batch Year', dataIndex: 'batch' },
+        { title: 'Batch Info', dataIndex: 'batch_info' },
     ]
 
     return (
@@ -346,9 +495,14 @@ export default function AdminMasterDataPage() {
                                 students.map(s => ({
                                     name: s.name,
                                     batch: s.batch,
+                                    batch_info: s.batch_info,
+                                    gender: s.gender,
                                     phone: s.phone,
                                     email: s.email,
                                     institute: s.institutions?.name,
+                                    'Individual Events': getEventNames(s.individual_events),
+                                    'Group Events': getEventNames(s.group_events),
+                                    status: s.is_active ? 'Active' : 'Inactive',
                                 })),
                                 'all-students'
                             )
@@ -358,10 +512,19 @@ export default function AdminMasterDataPage() {
                     </Button>
                 }
             >
+                <Space style={{ marginBottom: 16 }}>
+                    <Switch
+                        checked={showInactive}
+                        onChange={setShowInactive}
+                    />
+                    <span>Show inactive students</span>
+                </Space>
                 <Table
                     rowKey="id"
                     columns={studentColumns}
                     dataSource={students}
+                    scroll={{ x: 1800, y: 600 }}
+                    sticky
                     pagination={{ pageSize: 10 }}
                 />
             </Card>
@@ -392,11 +555,14 @@ export default function AdminMasterDataPage() {
                             exportToExcel(
                                 eventStudents.map(s => ({
                                     name: s.name,
+                                    gender: s.gender,
+                                    batch: s.batch,
+                                    batch_info: s.batch_info,
                                     phone: s.phone,
                                     email: s.email,
                                     institute: s.institutions?.name,
                                 })),
-                                'event-students'
+                                `${events.find(e => e.id === selectedEvent)?.name}-students`
                             )
                         }
                     >

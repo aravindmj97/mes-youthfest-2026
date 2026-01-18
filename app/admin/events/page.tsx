@@ -10,9 +10,11 @@ import {
     Space,
     Typography,
     message,
+    Popconfirm,
 } from 'antd'
 import { PlusOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons'
 import { supabase } from '@/lib/supabase'
+import { hardDelete, softDelete } from '@/lib/service'
 
 const { Title } = Typography
 const { Option } = Select
@@ -166,12 +168,28 @@ export default function EventsPage() {
                         </Button>
                     </Space>
                 ) : (
-                    <Button
-                        type="link"
-                        onClick={() => setEditingKey(record.id)}
-                    >
-                        Edit
-                    </Button>
+
+                    <Space>
+                        <Button
+                            type="link"
+                            onClick={() => setEditingKey(record.id)}
+                        >
+                            Edit
+                        </Button>
+
+                        <Popconfirm
+                            title="Delete this event?"
+                            description="This will remove the event from future selections."
+                            onConfirm={async () => {
+                                await hardDelete('events', record.id);
+                                fetchEvents();
+                            }}
+                        >
+                            <Button type="link" danger>
+                                Delete
+                            </Button>
+                        </Popconfirm>
+                    </Space>
                 ),
         },
     ]
