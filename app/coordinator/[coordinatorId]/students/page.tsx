@@ -306,6 +306,10 @@ export default function StudentsPage() {
                 ) : (
                     r.gender || '-'
                 ),
+            filters: GENDERS.map((item: any) => ({
+                text: item,
+                value: item,
+            })), onFilter: (v: any, r: any) => r.gender === v,
         },
         {
             title: 'Batch',
@@ -328,6 +332,10 @@ export default function StudentsPage() {
                 ) : (
                     <Tag>{r.batch}</Tag>
                 ),
+            filters: BATCH_YEARS.map((item: any) => ({
+                text: item,
+                value: item,
+            })), onFilter: (v: any, r: any) => r.batch === v,
         },
         {
             title: 'Batch Info',
@@ -404,6 +412,10 @@ export default function StudentsPage() {
                 ) : (
                     renderEventTags(r.individual_events, individualEvents)
                 ),
+            filters: individualEvents.map((item: any) => ({
+                text: item.name,
+                value: item.id,
+            })), onFilter: (v: any, r: any) => r.individual_events.includes(v),
         },
         {
             title: 'Group Events',
@@ -434,6 +446,10 @@ export default function StudentsPage() {
                 ) : (
                     renderEventTags(r.group_events, groupEvents)
                 ),
+            filters: groupEvents.map((item: any) => ({
+                text: item.name,
+                value: item.id,
+            })), onFilter: (v: any, r: any) => r.group_events.includes(v),
         },
         {
             title: 'Actions',

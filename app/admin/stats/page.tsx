@@ -55,11 +55,11 @@ export default function AdminStatsPage() {
 
         /* Summary */
         const individual =
-            registrations?.filter(r => 
+            registrations?.filter(r =>
                 //  @ts-expect-error: Its ok
                 r.events.type === 'INDIVIDUAL').length || 0
         const group =
-            registrations?.filter(r => 
+            registrations?.filter(r =>
                 //  @ts-expect-error: Its ok
                 r.events.type === 'GROUP').length || 0
 
@@ -150,9 +150,15 @@ export default function AdminStatsPage() {
                         <Table
                             rowKey="institute"
                             dataSource={institutionStats}
-                            pagination={false}
+                            pagination={{ pageSize: 10 }}
                             columns={[
-                                { title: 'Institute', dataIndex: 'institute' },
+                                {
+                                    title: 'Institute', dataIndex: 'institute',
+                                    filters: institutionStats.map((item: any) => ({
+                                        text: item.institute,
+                                        value: item.institute,
+                                    })), onFilter: (v: any, r: any) => r.institute === v,
+                                },
                                 { title: 'Students', dataIndex: 'students' },
                             ]}
                         />
@@ -164,9 +170,15 @@ export default function AdminStatsPage() {
                         <Table
                             rowKey="event"
                             dataSource={eventStats}
-                            pagination={false}
+                            pagination={{ pageSize: 10 }}
                             columns={[
-                                { title: 'Event', dataIndex: 'event' },
+                                {
+                                    title: 'Event', dataIndex: 'event',
+                                    filters: eventStats.map((item: any) => ({
+                                        text: item.event,
+                                        value: item.event,
+                                    })), onFilter: (v: any, r: any) => r.event === v,
+                                },
                                 { title: 'Participants', dataIndex: 'participants' },
                             ]}
                         />
