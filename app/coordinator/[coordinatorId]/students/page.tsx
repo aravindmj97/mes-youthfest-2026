@@ -397,7 +397,7 @@ export default function StudentsPage() {
                                     !r.individual_events.includes(e.id)
                                 }
                             >
-                                {e.name}
+                                {e.name + ` - ${e.is_on_stage ? 'On-Stage' : 'Off-Stage'}`}
                             </Option>
                         ))}
                     </Select>
